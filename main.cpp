@@ -19,6 +19,7 @@ class Screen{
         SDL_Window * window;
         SDL_Renderer *render;
         SDL_Rect Viewport={0,0,Width,Height};
+        
 
     bool init(){
         SDL_Init(SDL_INIT_EVERYTHING);
