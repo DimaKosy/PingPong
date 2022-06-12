@@ -5,64 +5,72 @@
 #include <SDL2/SDL.h>
 
 #define NUM_THREADS 5
+#define X_SCALE 16
+#define Y_SCALE 9
 
 using namespace std;
 
 class Screen{
     private:
-        int scaler = 50;
+        int scaler = 50;                        //screen scaler
+
     public:
-        int Width = 16*scaler;
-        int Height = 9*scaler;
-        int ScreenX[2], ScreenY[2];
+        int Width = X_SCALE*scaler;                  //screen width
+        int Height = Y_SCALE*scaler;                  //screen height
+        int ScreenX[2], ScreenY[2];             //dynamic w/h varibles
 
-        SDL_Window * window;
+        SDL_Window * window = NULL;
         SDL_Renderer *render;
-        SDL_Rect Viewport={0,0,Width,Height};
+        SDL_Rect Viewport={0,0,Width,Height};   //for maintaining a fixed aspect
         
-
+    //Initialises the screen and renderer
     bool init(){
         SDL_Init(SDL_INIT_EVERYTHING);
         window = SDL_CreateWindow( "PingPong", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, Width, Height, SDL_WINDOW_RESIZABLE);
-        if ( NULL == window){
-            cout << "Could not create window: " << SDL_GetError( ) << endl;
-            return false;
+        if(NULL == window){     //Check to see if window creation failed
+            cout << "Could not create window: " << SDL_GetError() << endl;
+            return false;       //Safe Exit
         }
 
         render = SDL_CreateRenderer(window, -1, 0);
-        SDL_GetWindowSize(window,&ScreenX[0],&ScreenY[0]);
+        SDL_SetRenderDrawBlendMode(render,SDL_BLENDMODE_BLEND);
+        SDL_GetWindowSize(window,&ScreenX[0],&ScreenY[0]);  //Assignes default sizes for screen comparison
         return true;
     }
 
+    //Resets renderer on screen change
     void ResetRender(){
+        SDL_GetWindowSize(window,&ScreenX[0],&ScreenY[0]);      //Assignes sizes for screen comparison
 
-        SDL_GetWindowSize(window,&ScreenX[0],&ScreenY[0]);
-
-        if(ScreenX[1] == ScreenX[0] && ScreenY[1] == ScreenY[0]){
-            return;
+        if(ScreenX[1] == ScreenX[0] && ScreenY[1] == ScreenY[0]){   //Compares sizes of screen since last change
+            return;     //returns if no change in size
         }
 
-        ScreenX[1] = ScreenX[0];
-        ScreenY[1] = ScreenY[0];
-        SDL_DestroyRenderer(render);
-        render = SDL_CreateRenderer(window, -1, 0);
+        ScreenX[1] = ScreenX[0];    //Changes comparison variable for width
+        ScreenY[1] = ScreenY[0];    //Changes comparison variable for height
+
+        SDL_DestroyRenderer(render);                //destroys old renderer instance
+        render = SDL_CreateRenderer(window, -1, 0); //creates new renderer instance
+        SDL_SetRenderDrawBlendMode(render,SDL_BLENDMODE_BLEND);
         
-        if(ScreenX[0]/16.0 < ScreenY[0]/9.0){
+        //View Scaling
+        if(ScreenX[0]/X_SCALE < ScreenY[0]/Y_SCALE){   //Checks what ratio is smaller
             Viewport.w = ScreenX[0];
-            Viewport.h = 9.0*(ScreenX[0]/16.0);
+            Viewport.h = Y_SCALE*((float)ScreenX[0]/X_SCALE);
         }
         else{
-            Viewport.w = 16.0*(ScreenY[0]/9.0);
+            Viewport.w = X_SCALE*((float)ScreenY[0]/Y_SCALE);
             Viewport.h = ScreenY[0];
         }
 
-        printf("X:%d Y:%d\n",ScreenX[0],ScreenY[0]);
-        printf("Scale %f %f\n",Viewport.w/(16.0*scaler),Viewport.h/(9.0*scaler));
+        //*DEBUG*/  printf("X:%d Y:%d\n",ScreenX[0],ScreenY[0]);
+        //*DEBUG*/  printf("Scale %f %f\n",(float)Viewport.w/(X_SCALE*scaler),(float)Viewport.h/(Y_SCALE*scaler));
         
-        SDL_RenderSetLogicalSize(render,Viewport.w,Viewport.h);
-        SDL_RenderSetScale(render,Viewport.w/(16.0*scaler), Viewport.h/(9.0*scaler));
+        SDL_RenderSetLogicalSize(render,Viewport.w,Viewport.h);                                             //centeres viewport
+        SDL_RenderSetScale(render,(float)Viewport.w/(X_SCALE*scaler), (float)Viewport.h/(Y_SCALE*scaler));  //sets view scale
     }
 
+    //Exits and destroys renderer and window references
     void exit(){
         SDL_DestroyRenderer(render);
         SDL_DestroyWindow(window);
@@ -74,16 +82,17 @@ class Ball{
     public:
         SDL_FRect Body;
 
+    //Moves the Rect
     void Move(float x, float y){
         Body.x += x;
         Body.y += y;
-        //printf("Move");
     }
 
-    void Render(SDL_Renderer * renderer, int r, int g, int b){
-        SDL_SetRenderDrawColor(renderer,r,g,b,255);
+    //Renders the Rect
+    void Render(SDL_Renderer * renderer, char r, char g, char b,char a){
+        SDL_SetRenderDrawColor(renderer,r,g,b,a);
         SDL_RenderFillRectF(renderer, &Body);
-        //SDL_RenderDrawRectF(renderer, &Body);
+
     }
 };
 
@@ -94,6 +103,9 @@ class Bat{
             10,0,
             20,100
         };
+        float CompErr = 3;
+        float CompErrDist = 0.5;
+        float CompErrMult = 3;
 
     void Move(int x, int y){
         Body.x += x;
@@ -105,9 +117,9 @@ class Bat{
         float Dist = abs((Body.x+Body.w/2) - (Ball.x+Ball.w/2));
         float Target;
 
-        Target = (MaxHeight/2) + ((pow(MaxWidth*1.1,2) - pow(Dist,2))/pow(MaxWidth*1.1,2)) * ((Ball.y + (Ball.h/2)) - (MaxHeight/2));
+        Target = (MaxHeight/2) + ((pow(MaxWidth*CompErrDist,CompErrMult) - pow(Dist,CompErrMult))/pow(MaxWidth*CompErrDist,CompErrMult)) * ((Ball.y + (Ball.h/2)) - (MaxHeight/2));
 
-        if(Target < Body.y + (Body.h/2) - 1.1*BatSpeed){
+        if(Target < Body.y + (Body.h/2) - CompErr*BatSpeed){
             Move(0, -BatSpeed);
 
             if (Body.y < 0){
@@ -115,7 +127,7 @@ class Bat{
             }
             return;
         }
-        if(Target > Body.y + (Body.h/2) + 1.1*BatSpeed){
+        if(Target > Body.y + (Body.h/2) + CompErr*BatSpeed){
             Move(0, BatSpeed);
 
             if(Body.y >= MaxHeight - Body.h){
@@ -133,7 +145,7 @@ class Bat{
 
 };
 
-typedef struct Objects{
+typedef struct Source{
     //Program Variables
     bool EventJoined = false;       //Check if Event Thread has joined
     bool ControlJoined = false;     //Check if Game Thread has joined
@@ -147,12 +159,13 @@ typedef struct Objects{
     Screen * Screen1;
     Ball Ball1;
     Bat bat[2];
-}Objects;
+}Source;
 
 //Game Thread
 void * GameThread(void * PassedStruct){
+    printf("Entered GameThread\n");
     //Engine Variables
-    Objects * ObjectList = (Objects *)(PassedStruct);   //Translating passed void * to Object *
+    Source * S_List = (Source *)(PassedStruct);   //Translating passed void * to Object *
     const Uint8 *state = SDL_GetKeyboardState(NULL);    //Creating Keyboard state stack
     clock_t START, CUR;                                 //For time comparison
     int TimeDif;                                        //Time since last frame
@@ -164,87 +177,103 @@ void * GameThread(void * PassedStruct){
     float SpeedX = FRAMESPEED;
     float SpeedY = FRAMESPEED;
     
-    SpeedX /= ObjectList->FrameRate;
-    SpeedY /= ObjectList->FrameRate;
-    ObjectList->bat[0].BatSpeed = 6*(FRAMESPEED/ObjectList->FrameRate);
-    ObjectList->bat[1].BatSpeed = 6*(FRAMESPEED/ObjectList->FrameRate);
+    SpeedX /= S_List->FrameRate;
+    SpeedY /= S_List->FrameRate;
+    S_List->bat[0].BatSpeed = 6*(FRAMESPEED/S_List->FrameRate);
+    S_List->bat[1].BatSpeed = 6*(FRAMESPEED/S_List->FrameRate);
 
-    while(!ObjectList->EventJoined);    //Thread sync
+    while(!S_List->EventJoined);    //Thread sync
+    if(!S_List->Running){
+        return 0;
+    }
 
-    while(ObjectList->Running){
+    //Just for Comp
+    SpeedX = 4*FRAMESPEED/S_List->FrameRate;
+    SpeedY = 4*FRAMESPEED/S_List->FrameRate;
+    //END
+
+    while(S_List->Running){
         CUR = clock();
         TimeDif = CUR - START;
 
-        if(TimeDif >= (1000/ObjectList->FrameRate)){
+        if(TimeDif >= (1000/S_List->FrameRate)){
             START = clock();
 
             //Game Code
-            if(ObjectList->Ball1.Body.x <= 0){
+            if(S_List->Ball1.Body.x <= 0){
                 DirX = 1;
-                ObjectList->Score[1]++;
+                S_List->Score[1]++;
 
-                ObjectList->Ball1.Body={ObjectList->bat[0].Body.x + ObjectList->Ball1.Body.w,ObjectList->bat[0].Body.y + ObjectList->bat[0].Body.h/2,20,20};
+                S_List->Ball1.Body={S_List->bat[0].Body.x + S_List->Ball1.Body.w,S_List->bat[0].Body.y + S_List->bat[0].Body.h/2,20,20};
 
-                printf("%d:%d  __%f\n",ObjectList->Score[0],ObjectList->Score[1],SpeedX);
-                SpeedX = FRAMESPEED/ObjectList->FrameRate + (SpeedX-FRAMESPEED/ObjectList->FrameRate)/2;
-                SpeedY = FRAMESPEED/ObjectList->FrameRate + (SpeedX-FRAMESPEED/ObjectList->FrameRate)/2;
+                printf("%d:%d  Speed:%f\n",S_List->Score[0],S_List->Score[1],SpeedX);
+                
+                SpeedX = FRAMESPEED/S_List->FrameRate + (SpeedX-FRAMESPEED/S_List->FrameRate)/2;
+                SpeedY = FRAMESPEED/S_List->FrameRate + (SpeedX-FRAMESPEED/S_List->FrameRate)/2;
+                
             }
-            else if(ObjectList->Ball1.Body.x + ObjectList->Ball1.Body.w >= ObjectList->Screen1->Width){
+            else if(S_List->Ball1.Body.x + S_List->Ball1.Body.w >= S_List->Screen1->Width){
                 DirX = -1;
-                ObjectList->Score[0]++;
+                S_List->Score[0]++;
 
-                ObjectList->Ball1.Body={ObjectList->bat[1].Body.x - ObjectList->Ball1.Body.w,ObjectList->bat[1].Body.y + ObjectList->bat[1].Body.h/2,20,20};
+                S_List->Ball1.Body={S_List->bat[1].Body.x - S_List->Ball1.Body.w,S_List->bat[1].Body.y + S_List->bat[1].Body.h/2,20,20};
 
-                printf("%d:%d\n",ObjectList->Score[0],ObjectList->Score[1]);
-                SpeedX = FRAMESPEED/ObjectList->FrameRate + (SpeedX-FRAMESPEED/ObjectList->FrameRate)/2;
-                SpeedY = FRAMESPEED/ObjectList->FrameRate + (SpeedX-FRAMESPEED/ObjectList->FrameRate)/2;
+                printf("%d:%d  Speed:%f\n",S_List->Score[0],S_List->Score[1],SpeedX);
+                
+                SpeedX = FRAMESPEED/S_List->FrameRate + (SpeedX-FRAMESPEED/S_List->FrameRate)/2;
+                SpeedY = FRAMESPEED/S_List->FrameRate + (SpeedX-FRAMESPEED/S_List->FrameRate)/2;
+                
             }
 
-            if(SDL_HasIntersectionF(&ObjectList->bat[0].Body,&ObjectList->Ball1.Body) == SDL_TRUE){
-                SpeedX += 10.0/ObjectList->FrameRate;
-                SpeedY += 8.0/ObjectList->FrameRate;
+            if(SDL_HasIntersectionF(&S_List->bat[0].Body,&S_List->Ball1.Body) == SDL_TRUE){
+                /*
+                SpeedX += 10.0/S_List->FrameRate;
+                SpeedY += 8.0/S_List->FrameRate;
+                */
                 DirX = 1;
             }
-            else if(SDL_HasIntersectionF(&ObjectList->bat[1].Body,&ObjectList->Ball1.Body) == SDL_TRUE){
-                SpeedX += 10.0/ObjectList->FrameRate;
-                SpeedY += 8.0/ObjectList->FrameRate;
+            else if(SDL_HasIntersectionF(&S_List->bat[1].Body,&S_List->Ball1.Body) == SDL_TRUE){
+                /*
+                SpeedX += 10.0/S_List->FrameRate;
+                SpeedY += 8.0/S_List->FrameRate;
+                */
                 DirX = -1;
             }
 
-            if(ObjectList->Ball1.Body.y < 0){
+            if(S_List->Ball1.Body.y < 0){
                 DirY = 1;
             }
-            else if(ObjectList->Ball1.Body.y + ObjectList->Ball1.Body.h >= ObjectList->Screen1->Height){
+            else if(S_List->Ball1.Body.y + S_List->Ball1.Body.h >= S_List->Screen1->Height){
                 DirY = -1;
             }
 
             //Player Bat Movement
             if(state[SDL_SCANCODE_W]){
-                ObjectList->bat[0].Move(0, -ObjectList->bat[0].BatSpeed);
+                S_List->bat[0].Move(0, -S_List->bat[0].BatSpeed);
 
-                if (ObjectList->bat[0].Body.y < 0){
-                    ObjectList->bat[0].Body.y = 0;
+                if (S_List->bat[0].Body.y < 0){
+                    S_List->bat[0].Body.y = 0;
                 }
             }
             if(state[SDL_SCANCODE_S]){
-                ObjectList->bat[0].Move(0, ObjectList->bat[0].BatSpeed);
+                S_List->bat[0].Move(0, S_List->bat[0].BatSpeed);
 
-                if(ObjectList->bat[0].Body.y > ObjectList->Screen1->Height - ObjectList->bat[0].Body.h){
-                    ObjectList->bat[0].Body.y = ObjectList->Screen1->Height - ObjectList->bat[0].Body.h;
+                if(S_List->bat[0].Body.y > S_List->Screen1->Height - S_List->bat[0].Body.h){
+                    S_List->bat[0].Body.y = S_List->Screen1->Height - S_List->bat[0].Body.h;
                 }
             }
 
             //Comp Bat Movement
-            ObjectList->bat[1].CompController(ObjectList->Screen1->Width,ObjectList->Screen1->Height,ObjectList->Ball1.Body);
-            ObjectList->bat[0].CompController(ObjectList->Screen1->Width,ObjectList->Screen1->Height,ObjectList->Ball1.Body);
+            S_List->bat[1].CompController(S_List->Screen1->Width,S_List->Screen1->Height,S_List->Ball1.Body);
+            S_List->bat[0].CompController(S_List->Screen1->Width,S_List->Screen1->Height,S_List->Ball1.Body);
 
-            ObjectList->Ball1.Move(SpeedX*DirX*3,SpeedY*DirY);
+            S_List->Ball1.Move(SpeedX*DirX*3,SpeedY*DirY);
 
             //End of Game Code
         }
     }
 
-    printf("Exit EventThread\n");
+    printf("Exit Game thread\n");
     pthread_exit(NULL);
     return NULL;
 }
@@ -256,26 +285,25 @@ void * EventThread(void * PassedStruct){
     static Screen MainWindow;                           //initialize Mainwindow object
     SDL_Event event;                                    //event stack
 
-    Objects * ObjectList = (Objects *)(PassedStruct);   //Translating passed void * to Object *
+    Source * S_List = (Source *)(PassedStruct);   //Translating passed void * to Object *
 
-    ObjectList->Screen1 = &MainWindow;                  //passing Mainwindow address to global address struct
+    S_List->Screen1 = &MainWindow;                  //passing Mainwindow address to global address struct
 
     if(!MainWindow.init()){
-        ObjectList->EventJoined = true;
-        ObjectList->Running = false;
+        S_List->Running = false;
+        S_List->EventJoined = true;
         return NULL;
     }
 
-    ObjectList->EventJoined = true;
-    ObjectList->Running = true;
-
-    while(ObjectList->Running){
+    S_List->Running = true;
+    S_List->EventJoined = true;
+    
+    while(S_List->Running){
         while(SDL_PollEvent(&event)){
             if (SDL_QUIT == event.type){
-                ObjectList->Running = false;
+                S_List->Running = false;
                 break;
-            }
-            
+            }    
             
             /*switch(event.type){
                 case SDL_WINDOWEVENT:
@@ -358,80 +386,76 @@ void * EventThread(void * PassedStruct){
 int main(int argc, char *argv[]){
     printf("Entered Main\n");
 
-    Objects ObjectList_M;
+    Source S_List_M;
     clock_t START, CUR;
 
     int TimeDif;
     int Err;
 
-    printf("Assigned\n");
-
-    Err = pthread_create(&ObjectList_M.threads[1], NULL, GameThread, (void *)(&ObjectList_M));
+    Err = pthread_create(&S_List_M.threads[1], NULL, GameThread, (void *)(&S_List_M));
     if (Err != 0) {
         cout << "Error:unable to create Control thread" << endl;
 
-        ObjectList_M.EventJoined = true;
-        ObjectList_M.Running = false;
+        S_List_M.EventJoined = true;
+        S_List_M.Running = false;
     }
-
-    Err = pthread_create(&ObjectList_M.threads[0], NULL, EventThread, (void *)(&ObjectList_M));
+    Err = pthread_create(&S_List_M.threads[0], NULL, EventThread, (void *)(&S_List_M));
     if (Err != 0) {
         cout << "Error:unable to create Event thread" << endl;
 
-        ObjectList_M.EventJoined = true;
-        ObjectList_M.Running = false;
+        S_List_M.EventJoined = true;
+        S_List_M.Running = false;
     }
-    printf("Thread Made\n");
 
-    while(!ObjectList_M.EventJoined);   //Thread sync
-    if(!ObjectList_M.Running){
+    while(!S_List_M.EventJoined);   //Thread sync
+    if(!S_List_M.Running){
         return 0;
     }
 
     SDL_Rect RenderBox={
         0,0,
-        ObjectList_M.Screen1->Width, ObjectList_M.Screen1->Height
+        S_List_M.Screen1->Width, S_List_M.Screen1->Height
     };
 
-    ObjectList_M.Ball1.Body={(float)ObjectList_M.Screen1->ScreenX[0]/2,0,20,20};
+    S_List_M.Ball1.Body={(float)S_List_M.Screen1->ScreenX[0]/2,0,20,20};
 
-    SDL_SetRenderDrawColor(ObjectList_M.Screen1->render,0,0,0,255);
-    SDL_RenderClear(ObjectList_M.Screen1->render);
-    SDL_RenderPresent(ObjectList_M.Screen1->render);
+    SDL_SetRenderDrawColor(S_List_M.Screen1->render,0,0,0,255);
+    SDL_RenderClear(S_List_M.Screen1->render);
+    SDL_RenderPresent(S_List_M.Screen1->render);
 
-    ObjectList_M.bat[1].Body.x = ObjectList_M.Screen1->ScreenX[0] - ObjectList_M.bat[1].Body.w-10;
+    S_List_M.bat[1].Body.x = S_List_M.Screen1->ScreenX[0] - S_List_M.bat[1].Body.w-10;
 
     START = clock();
-    while(ObjectList_M.Running){       
+    while(S_List_M.Running){       
 
         CUR = clock();
         TimeDif = CUR - START;
 
-        if(TimeDif >= (1000/ObjectList_M.RefreshRate)){
+        if(TimeDif >= (1000/S_List_M.RefreshRate)){
             START = clock();
 
-            ObjectList_M.Screen1->ResetRender();
+            S_List_M.Screen1->ResetRender();
 
             //printf("Ran");
-            SDL_SetRenderDrawColor(ObjectList_M.Screen1->render,0,0,0,255);
-            SDL_RenderClear(ObjectList_M.Screen1->render);
+            SDL_SetRenderDrawColor(S_List_M.Screen1->render,0,0,0,255);
+            SDL_RenderClear(S_List_M.Screen1->render);
 
-            ObjectList_M.Ball1.Render(ObjectList_M.Screen1->render,255,255,255);
-            ObjectList_M.bat[0].Render(ObjectList_M.Screen1->render,0,0,255);
-            ObjectList_M.bat[1].Render(ObjectList_M.Screen1->render,255,0,0);
+            S_List_M.Ball1.Render(S_List_M.Screen1->render,255,255,255,255);
+            S_List_M.bat[0].Render(S_List_M.Screen1->render,0,0,255);
+            S_List_M.bat[1].Render(S_List_M.Screen1->render,255,0,0);
 
-            SDL_SetRenderDrawColor(ObjectList_M.Screen1->render,255,255,255,255);
-            SDL_RenderDrawRect(ObjectList_M.Screen1->render, &RenderBox);
+            SDL_SetRenderDrawColor(S_List_M.Screen1->render,255,255,255,255);
+            SDL_RenderDrawRect(S_List_M.Screen1->render, &RenderBox);
 
-            SDL_RenderPresent(ObjectList_M.Screen1->render);    //Push to window
+            SDL_RenderPresent(S_List_M.Screen1->render);    //Push to window
         }
     }
 
     //EXIT
     printf("Closing\n");
-    ObjectList_M.Screen1->exit();
-    pthread_join(ObjectList_M.threads[1],NULL);
-    pthread_join(ObjectList_M.threads[0],NULL);
+    S_List_M.Screen1->exit();
+    pthread_join(S_List_M.threads[1],NULL);
+    pthread_join(S_List_M.threads[0],NULL);
     return EXIT_SUCCESS;
 
 }
