@@ -82,7 +82,7 @@ class Ball{
     public:
         SDL_FRect Body;
 
-    //Moves the Rect
+    //Moves the Ball
     void Move(float x, float y){
         Body.x += x;
         Body.y += y;
@@ -98,27 +98,31 @@ class Ball{
 
 class Bat{
     public:
-        float BatSpeed = 1.5;
+        float BatSpeed = 1.5;   //Bat movement speed
         SDL_FRect Body = {
             10,0,
             20,100
         };
-        float CompErr = 3;
-        float CompErrDist = 0.5;
-        float CompErrMult = 3;
+        float CompErr = 3;          //Comp target lock error
+        float CompErrDist = 0.5;    //comp distance error multiplier
+        float CompErrMult = 3;      //comp error scaler
 
+    //Moves the Bat
     void Move(int x, int y){
         Body.x += x;
         Body.y += y;
         //printf("Move");
     }
 
+    //To make the bat comp controlled
     void CompController(int MaxWidth,int MaxHeight, SDL_FRect Ball){
-        float Dist = abs((Body.x+Body.w/2) - (Ball.x+Ball.w/2));
-        float Target;
+        float Dist = abs((Body.x+Body.w/2) - (Ball.x+Ball.w/2));    //Distance between the bat and the ball
+        float Target;   //Where the Bat should go
 
+        //Target formula
         Target = (MaxHeight/2) + ((pow(MaxWidth*CompErrDist,CompErrMult) - pow(Dist,CompErrMult))/pow(MaxWidth*CompErrDist,CompErrMult)) * ((Ball.y + (Ball.h/2)) - (MaxHeight/2));
 
+        //Checks where the target is and moves to compensate
         if(Target < Body.y + (Body.h/2) - CompErr*BatSpeed){
             Move(0, -BatSpeed);
 
@@ -137,6 +141,7 @@ class Bat{
         }
     }
 
+    //Display the Bat
     void Render(SDL_Renderer * renderer, int r, int g, int b){
         SDL_SetRenderDrawColor(renderer,r,g,b,255);
         SDL_RenderFillRectF(renderer, &Body);
