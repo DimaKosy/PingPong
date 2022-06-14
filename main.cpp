@@ -103,9 +103,9 @@ class Bat{
             10,0,
             20,100
         };
-        float CompErr = 3;          //Comp target lock error
-        float CompErrDist = 0.5;    //comp distance error multiplier
-        float CompErrMult = 3;      //comp error scaler
+        float CompErr = 2;          //Comp target lock error
+        float CompErrDist = 1.1;    //comp distance error multiplier
+        float CompErrMult = 1;      //comp error scaler
 
     //Moves the Bat
     void Move(int x, int y){
@@ -120,7 +120,8 @@ class Bat{
         float Target;   //Where the Bat should go
 
         //Target formula
-        Target = (MaxHeight/2) + ((pow(MaxWidth*CompErrDist,CompErrMult) - pow(Dist,CompErrMult))/pow(MaxWidth*CompErrDist,CompErrMult)) * ((Ball.y + (Ball.h/2)) - (MaxHeight/2));
+        Target = (MaxHeight/2) + ((pow(MaxWidth,CompErrMult) - pow(Dist,CompErrMult))/pow(MaxWidth*CompErrDist,CompErrMult)) * ((Ball.y + (Ball.h/2)) - (MaxHeight/2));
+        //Target = (MaxHeight/2) + (1) * ((Ball.y + (Ball.h/2)) - (MaxHeight/2));
 
         //Checks where the target is and moves to compensate
         if(Target < Body.y + (Body.h/2) - CompErr*BatSpeed){
@@ -166,6 +167,22 @@ typedef struct Source{
     Bat bat[2];
 }Source;
 
+void Speed(float SpeedX, float SpeedY,Source * S_List){
+    float FRAMESPEED = 60;
+
+    switch(1){
+        case 1:
+            SpeedX = 4*FRAMESPEED/S_List->FrameRate;
+            SpeedY = 4*FRAMESPEED/S_List->FrameRate;
+        break;
+        case 2:
+            SpeedX += 10.0/S_List->FrameRate;
+            SpeedY += 8.0/S_List->FrameRate;
+        break;
+    }
+    
+}
+
 //Game Thread
 void * GameThread(void * PassedStruct){
     printf("Entered GameThread\n");
@@ -194,7 +211,7 @@ void * GameThread(void * PassedStruct){
 
     //Just for Comp
     SpeedX = 4*FRAMESPEED/S_List->FrameRate;
-    SpeedY = 4*FRAMESPEED/S_List->FrameRate;
+    SpeedY = 5*FRAMESPEED/S_List->FrameRate;
     //END
 
     while(S_List->Running){
@@ -231,17 +248,11 @@ void * GameThread(void * PassedStruct){
             }
 
             if(SDL_HasIntersectionF(&S_List->bat[0].Body,&S_List->Ball1.Body) == SDL_TRUE){
-                /*
-                SpeedX += 10.0/S_List->FrameRate;
-                SpeedY += 8.0/S_List->FrameRate;
-                */
+                Speed(SpeedX, SpeedY,S_List);
                 DirX = 1;
             }
             else if(SDL_HasIntersectionF(&S_List->bat[1].Body,&S_List->Ball1.Body) == SDL_TRUE){
-                /*
-                SpeedX += 10.0/S_List->FrameRate;
-                SpeedY += 8.0/S_List->FrameRate;
-                */
+                Speed(SpeedX, SpeedY,S_List);
                 DirX = -1;
             }
 
