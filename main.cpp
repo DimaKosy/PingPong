@@ -212,7 +212,7 @@ void * GameThread(void * PassedStruct){
     //Just for Comp
     SpeedX = 4*FRAMESPEED/S_List->FrameRate;
     SpeedY = 5*FRAMESPEED/S_List->FrameRate;
-    //END
+    //END//
 
     while(S_List->Running){
         CUR = clock();
