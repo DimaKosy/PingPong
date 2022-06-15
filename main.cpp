@@ -167,17 +167,17 @@ typedef struct Source{
     Bat bat[2];
 }Source;
 
-void Speed(float SpeedX, float SpeedY,Source * S_List){
+void Speed(float *SpeedX, float *SpeedY,Source * S_List){
     float FRAMESPEED = 60;
 
-    switch(1){
+    switch(2){
         case 1:
-            SpeedX = 4*FRAMESPEED/S_List->FrameRate;
-            SpeedY = 4*FRAMESPEED/S_List->FrameRate;
+            *SpeedX = 4*FRAMESPEED/S_List->FrameRate;
+            *SpeedY = 4*FRAMESPEED/S_List->FrameRate;
         break;
         case 2:
-            SpeedX += 10.0/S_List->FrameRate;
-            SpeedY += 8.0/S_List->FrameRate;
+            *SpeedX += 10.0/S_List->FrameRate;
+            *SpeedY += 8.0/S_List->FrameRate;
         break;
     }
     
@@ -248,11 +248,11 @@ void * GameThread(void * PassedStruct){
             }
 
             if(SDL_HasIntersectionF(&S_List->bat[0].Body,&S_List->Ball1.Body) == SDL_TRUE){
-                Speed(SpeedX, SpeedY,S_List);
+                Speed(&SpeedX, &SpeedY,S_List);
                 DirX = 1;
             }
             else if(SDL_HasIntersectionF(&S_List->bat[1].Body,&S_List->Ball1.Body) == SDL_TRUE){
-                Speed(SpeedX, SpeedY,S_List);
+                Speed(&SpeedX, &SpeedY,S_List);
                 DirX = -1;
             }
 
@@ -280,8 +280,8 @@ void * GameThread(void * PassedStruct){
             }
 
             //Comp Bat Movement
+            //S_List->bat[0].CompController(S_List->Screen1->Width,S_List->Screen1->Height,S_List->Ball1.Body);
             S_List->bat[1].CompController(S_List->Screen1->Width,S_List->Screen1->Height,S_List->Ball1.Body);
-            S_List->bat[0].CompController(S_List->Screen1->Width,S_List->Screen1->Height,S_List->Ball1.Body);
 
             S_List->Ball1.Move(SpeedX*DirX*3,SpeedY*DirY);
 
